@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nip19 — display encoding demo</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  h1 { font-size: 1.4rem; } h1 a { text-decoration: none; }
+  code, pre { background: rgba(127,127,127,.12); border-radius: 4px; padding: .1em .3em; }
+  pre { padding: .75em; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  input { font: inherit; width: 100%; padding: .5em; border-radius: 8px; box-sizing: border-box;
+    border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit;
+    font-family: ui-monospace, monospace; }
+  blockquote { border-left: 3px solid #8e30eb; margin-left: 0; padding-left: 1em; opacity: .85; }
+</style>
+</head>
+<body>
+<h1><a href="https://github.com/nostr-client/nip19">nostr-client / nip19</a></h1>
+<blockquote><strong>Hex is the primitive. NIP-19 is presentation.</strong><br>
+Encode at the last moment before display; decode at the first moment after input.</blockquote>
+
+<p>Paste anything — hex pubkey, <code>npub…</code>, <code>note…</code>:</p>
+<input id="in" value="82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2" spellcheck="false">
+<pre id="out"></pre>
+
+<script type="module">
+  import { decode, npubEncode, noteEncode, npubShort } from './nip19.js'
+
+  const input = document.getElementById('in')
+  const out = document.getElementById('out')
+
+  function render() {
+    try {
+      const { type, hex } = decode(input.value)
+      out.textContent = [
+        'primitive (hex): ' + hex,
+        'input type     : ' + type,
+        '',
+        '— display forms —',
+        'npub  : ' + npubEncode(hex),
+        'short : ' + npubShort(hex),
+        'note  : ' + noteEncode(hex) + '  (if this were an event id)',
+      ].join('\n')
+    } catch (e) {
+      out.textContent = '✗ ' + (e.message || e)
+    }
+  }
+  input.oninput = render
+  render()
+</script>
+</body>
+</html>
