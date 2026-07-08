@@ -106,6 +106,46 @@ export function decode(str) {
   return { type: hrp, hex: bytesToHex(bytes) }
 }
 
+/**
+ * Decode TLV entities (nprofile / nevent / naddr) — accepted at the UI edge
+ * (pasted strings, nostr: links in note content) and immediately reduced to
+ * hex primitives + hints.
+ *
+ * Returns, by type:
+ *   nprofile → { type, hex: <pubkey>, relays }
+ *   nevent   → { type, hex: <event id>, relays, author?, kind? }
+ *   naddr    → { type, identifier, author, kind, relays }
+ * Bare npub/nsec/note/hex fall through to decode()'s shape.
+ */
+export function decodeAny(str) {
+  str = String(str).trim().replace(/^nostr:/, '')
+  if (/^(npub|nsec|note)1|^[0-9a-fA-F]{64}$/.test(str)) return decode(str)
+  const { hrp, bytes } = bech32Decode(str)
+  if (!['nprofile', 'nevent', 'naddr'].includes(hrp)) throw new Error('unsupported prefix: ' + hrp)
+  const tlv = {}
+  for (let i = 0; i + 1 < bytes.length;) {
+    const type = bytes[i]
+    const len = bytes[i + 1]
+    const value = bytes.slice(i + 2, i + 2 + len)
+    if (value.length !== len) throw new Error('tlv: truncated')
+    ;(tlv[type] ??= []).push(value)
+    i += 2 + len
+  }
+  const relays = (tlv[1] ?? []).map((v) => new TextDecoder().decode(v))
+  const author = tlv[2]?.[0] ? bytesToHex(tlv[2][0]) : undefined
+  const kind = tlv[3]?.[0] ? new DataView(tlv[3][0].buffer, tlv[3][0].byteOffset).getUint32(0) : undefined
+  if (!tlv[0]?.[0]) throw new Error(hrp + ': missing special field')
+  if (hrp === 'nprofile') {
+    if (tlv[0][0].length !== 32) throw new Error('nprofile: bad pubkey length')
+    return { type: hrp, hex: bytesToHex(tlv[0][0]), relays }
+  }
+  if (hrp === 'nevent') {
+    if (tlv[0][0].length !== 32) throw new Error('nevent: bad id length')
+    return { type: hrp, hex: bytesToHex(tlv[0][0]), relays, author, kind }
+  }
+  return { type: hrp, identifier: new TextDecoder().decode(tlv[0][0]), relays, author, kind }
+}
+
 /** "npub1sg6plz…f63m" — the standard short display form. */
 export function shorten(nip19str, head = 10, tail = 4) {
   return nip19str.length <= head + tail + 1 ? nip19str : nip19str.slice(0, head) + '…' + nip19str.slice(-tail)
